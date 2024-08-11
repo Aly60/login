@@ -1,20 +1,34 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { sentEmail } from "./helper/emailjs";
 
 const Login = () => {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState("login"); // Can be 'login' or 'verify'
+  const [step, setStep] = useState("login");
 
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
       // Generate and send OTP
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      await axios.post("http://localhost:5000/otps", { email, otp: otpCode });
-      localStorage.setItem("otpEmail", email);
-      localStorage.setItem(`otp_${email}`, otpCode); // Store OTP in localStorage (for demonstration)
-      setStep("verify"); // Move to OTP verification step
+      await sentEmail({
+        to: email,
+        to_name: username,
+        from_name: "Login Page",
+        message: `Your OTP is ${otpCode}`,
+      });
+
+      const res = await axios.post("http://localhost:5000/otps", {
+        email,
+        otp: otpCode,
+      });
+      if (res.status === 200) {
+        localStorage.setItem("otpEmail", email);
+        setStep("verify");
+      }
     } catch (error) {
       console.error("Error sending OTP:", error);
     }
@@ -23,20 +37,18 @@ const Login = () => {
   const handleOtpVerification = async (e) => {
     e.preventDefault();
     const storedEmail = localStorage.getItem("otpEmail");
-    //  const storedOtp = localStorage.getItem(`otp_${storedEmail}`);
 
     try {
-      // Verify OTP
+      // Verify OTP by fetching it from the server
       const { data } = await axios.get("http://localhost:5000/otps", {
         params: { email: storedEmail },
       });
       const isValidOtp = data.some((entry) => entry.otp === otp);
 
       if (isValidOtp) {
-        localStorage.removeItem("otpEmail");
-        localStorage.removeItem(`otp_${storedEmail}`);
         console.log("OTP verified");
-        // Handle successful login
+        localStorage.removeItem("otpEmail");
+        setStep("login");
       } else {
         console.error("Invalid OTP");
       }
@@ -60,6 +72,30 @@ const Login = () => {
           </p>
           {step === "login" ? (
             <form onSubmit={handleLogin}>
+              <div className="mt-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Username
+                </label>
+                <input
+                  className="text-gray-700 border border-gray-300 rounded py-2 px-4 block w-full focus:outline-2 focus:outline-blue-700"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="mt-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Password
+                </label>
+                <input
+                  className="text-gray-700 border border-gray-300 rounded py-2 px-4 block w-full focus:outline-2 focus:outline-blue-700"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
               <div className="mt-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Email Address
@@ -89,6 +125,7 @@ const Login = () => {
                   type="text"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
+                  maxLength={6}
                   required
                 />
               </div>
@@ -101,7 +138,7 @@ const Login = () => {
           )}
           <div className="mt-4 flex items-center w-full text-center">
             <a
-              href="#"
+              href="/"
               className="text-xs text-gray-500 capitalize text-center w-full"
             >
               Don&apos;t have an account yet?
