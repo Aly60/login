@@ -1,58 +1,117 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { sentEmail } from "./helper/emailjs";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("login");
+  const [error, setError] = useState(""); // State for error messages
+  const [success, setSuccess] = useState(""); // State for success messages
+  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+
+  const navigate = useNavigate(); // Initialize the navigate function
+
+  // Determine if the button should be enabled
+  const isButtonDisabled = !email || !password;
+
+  // Effect to clear success message after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess("");
+      }, 3000); // Clear message after 3 seconds
+
+      return () => clearTimeout(timer); // Cleanup timeout on component unmount
+    }
+  }, [success]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError(""); // Reset error state
+    setSuccess(""); // Reset success state
+
     try {
+      // Check if the user exists
+      const { data: users } = await axios.get("http://localhost:5000/users");
+      const user = users.find(
+        (user) => user.password === password && user.email === email
+      );
+
+      if (!user) {
+        setError("Invalid password or email");
+        return; // Exit if user credentials are incorrect
+      }
+
       // Generate and send OTP
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       await sentEmail({
         to: email,
-        to_name: username,
         from_name: "Login Page",
         message: `Your OTP is ${otpCode}`,
       });
 
-      const res = await axios.post("http://localhost:5000/otps", {
+      // Store OTP in the JSON server
+      await axios.post("http://localhost:5000/otps", {
         email,
         otp: otpCode,
+        createdAt: new Date().toISOString(), // Add a timestamp for expiration checking
       });
-      if (res.status === 200) {
-        localStorage.setItem("otpEmail", email);
-        setStep("verify");
-      }
+
+      localStorage.setItem("otpEmail", email);
+      setStep("verify");
+      setSuccess("OTP has been sent successfully!"); // Set success message
     } catch (error) {
-      console.error("Error sending OTP:", error);
+      setError("Error during login. Please try again.");
+      console.error("Error during login:", error);
     }
   };
 
   const handleOtpVerification = async (e) => {
     e.preventDefault();
+    setError(""); // Reset error state
+
     const storedEmail = localStorage.getItem("otpEmail");
+    const currentTime = new Date().toISOString();
 
     try {
       // Verify OTP by fetching it from the server
       const { data } = await axios.get("http://localhost:5000/otps", {
         params: { email: storedEmail },
       });
-      const isValidOtp = data.some((entry) => entry.otp === otp);
 
-      if (isValidOtp) {
-        console.log("OTP verified");
-        localStorage.removeItem("otpEmail");
-        setStep("login");
-      } else {
-        console.error("Invalid OTP");
+      const otpEntry = data.find((entry) => entry.otp === otp);
+      if (!otpEntry) {
+        setError("Invalid OTP");
+        localStorage.removeItem("otpEmail"); // Clear stored email
+        setTimeout(() => {
+          navigate("/login"); // Redirect to login page after 3 seconds
+        }, 1000);
+        return;
       }
+
+      // Check if OTP is expired (set expiration time as 5 minutes)
+      const otpAge =
+        (new Date(currentTime) - new Date(otpEntry.createdAt)) / 1000 / 60;
+      if (otpAge > 5) {
+        setError("OTP has expired");
+        localStorage.removeItem("otpEmail"); // Clear stored email
+        setTimeout(() => {
+          navigate("/login"); // Redirect to login page after 3 seconds
+        }, 1000);
+        return;
+      }
+
+      console.log("OTP verified");
+      localStorage.removeItem("otpEmail");
+      setSuccess("OTP verified successfully! Redirecting...");
+
+      // Redirect to the home page immediately
+      navigate("/");
     } catch (error) {
+      setError("Error verifying OTP. Please try again.");
       console.error("Error verifying OTP:", error);
     }
   };
@@ -70,32 +129,10 @@ const Login = () => {
           <p className="text-xl text-gray-600 text-center">
             {step === "login" ? "Welcome back!" : "Verify your OTP"}
           </p>
+          {error && <p className="text-red-500 text-center">{error}</p>}
+          {success && <p className="text-green-500 text-center">{success}</p>}
           {step === "login" ? (
             <form onSubmit={handleLogin}>
-              <div className="mt-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Username
-                </label>
-                <input
-                  className="text-gray-700 border border-gray-300 rounded py-2 px-4 block w-full focus:outline-2 focus:outline-blue-700"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="mt-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Password
-                </label>
-                <input
-                  className="text-gray-700 border border-gray-300 rounded py-2 px-4 block w-full focus:outline-2 focus:outline-blue-700"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
               <div className="mt-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Email Address
@@ -108,8 +145,47 @@ const Login = () => {
                   required
                 />
               </div>
+              <div className="mt-4 relative">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Password
+                </label>
+                <input
+                  className="text-gray-700 border border-gray-300 rounded py-2 px-4 block w-full focus:outline-2 focus:outline-blue-700"
+                  type={showPassword ? "text" : "password"} // Toggle password visibility
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <span
+                  className="absolute inset-y-0 right-0 flex items-center px-2 cursor-pointer"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  <i
+                    className={`fas ${
+                      showPassword ? "fa-eye-slash" : "fa-eye"
+                    }`}
+                  ></i>
+                </span>
+              </div>
+              <div className="mt-4 flex items-center">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={() => setShowPassword(!showPassword)}
+                  className="mr-2"
+                />
+                <label className="text-gray-700 text-sm font-semibold">
+                  Show Password
+                </label>
+              </div>
               <div className="mt-8">
-                <button className="bg-blue-700 text-white font-bold py-2 px-4 w-full rounded hover:bg-blue-600">
+                <button
+                  type="submit"
+                  className={`bg-blue-700 text-white font-bold py-2 px-4 w-full rounded hover:bg-blue-600 ${
+                    isButtonDisabled ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={isButtonDisabled} // Disable the button based on the condition
+                >
                   Send OTP
                 </button>
               </div>
