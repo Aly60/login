@@ -11,10 +11,11 @@ const Login = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const isButtonDisabled = !email || !password;
+  const isButtonDisabled = !email || !password || loading;
 
   useEffect(() => {
     if (success) {
@@ -30,6 +31,7 @@ const Login = () => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setLoading(true);
 
     try {
       // Check if the user exists
@@ -40,7 +42,8 @@ const Login = () => {
 
       if (!user) {
         setError("Invalid password or email");
-        return; // Exit if user is incorrect
+        setLoading(false);
+        return;
       }
 
       // Generate and send OTP
@@ -61,9 +64,11 @@ const Login = () => {
       localStorage.setItem("otpEmail", email);
       setStep("verify");
       setSuccess("OTP has been sent successfully!");
+      setLoading(false);
     } catch (error) {
       setError("Error during login. Please try again.");
       console.error("Error during login:", error);
+      setLoading(false);
     }
   };
 
@@ -182,7 +187,7 @@ const Login = () => {
                   }`}
                   disabled={isButtonDisabled}
                 >
-                  Send OTP
+                  {loading ? "Sending OTP..." : "Send OTP"}
                 </button>
               </div>
             </form>
@@ -208,6 +213,15 @@ const Login = () => {
               </div>
             </form>
           )}
+          <div className="mt-4 flex items-center w-full text-center">
+            <a
+              href="/"
+              className="text-xs text-gray-500 capitalize text-center w-full"
+            >
+              Don&apos;t have an account yet?
+              <span className="text-blue-700"> Sign Up</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>
