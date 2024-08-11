@@ -8,30 +8,28 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("login");
-  const [error, setError] = useState(""); // State for error messages
-  const [success, setSuccess] = useState(""); // State for success messages
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-  const navigate = useNavigate(); // Initialize the navigate function
+  const navigate = useNavigate();
 
-  // Determine if the button should be enabled
   const isButtonDisabled = !email || !password;
 
-  // Effect to clear success message after 3 seconds
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => {
         setSuccess("");
-      }, 3000); // Clear message after 3 seconds
+      }, 3000);
 
-      return () => clearTimeout(timer); // Cleanup timeout on component unmount
+      return () => clearTimeout(timer);
     }
   }, [success]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError(""); // Reset error state
-    setSuccess(""); // Reset success state
+    setError("");
+    setSuccess("");
 
     try {
       // Check if the user exists
@@ -42,7 +40,7 @@ const Login = () => {
 
       if (!user) {
         setError("Invalid password or email");
-        return; // Exit if user credentials are incorrect
+        return; // Exit if user is incorrect
       }
 
       // Generate and send OTP
@@ -57,12 +55,12 @@ const Login = () => {
       await axios.post("http://localhost:5000/otps", {
         email,
         otp: otpCode,
-        createdAt: new Date().toISOString(), // Add a timestamp for expiration checking
+        createdAt: new Date().toISOString(),
       });
 
       localStorage.setItem("otpEmail", email);
       setStep("verify");
-      setSuccess("OTP has been sent successfully!"); // Set success message
+      setSuccess("OTP has been sent successfully!");
     } catch (error) {
       setError("Error during login. Please try again.");
       console.error("Error during login:", error);
@@ -71,7 +69,7 @@ const Login = () => {
 
   const handleOtpVerification = async (e) => {
     e.preventDefault();
-    setError(""); // Reset error state
+    setError("");
 
     const storedEmail = localStorage.getItem("otpEmail");
     const currentTime = new Date().toISOString();
@@ -85,21 +83,20 @@ const Login = () => {
       const otpEntry = data.find((entry) => entry.otp === otp);
       if (!otpEntry) {
         setError("Invalid OTP");
-        localStorage.removeItem("otpEmail"); // Clear stored email
+        localStorage.removeItem("otpEmail");
         setTimeout(() => {
-          navigate("/login"); // Redirect to login page after 3 seconds
+          navigate("/login");
         }, 1000);
         return;
       }
 
-      // Check if OTP is expired (set expiration time as 5 minutes)
       const otpAge =
         (new Date(currentTime) - new Date(otpEntry.createdAt)) / 1000 / 60;
       if (otpAge > 5) {
         setError("OTP has expired");
-        localStorage.removeItem("otpEmail"); // Clear stored email
+        localStorage.removeItem("otpEmail");
         setTimeout(() => {
-          navigate("/login"); // Redirect to login page after 3 seconds
+          navigate("/login");
         }, 1000);
         return;
       }
@@ -108,7 +105,6 @@ const Login = () => {
       localStorage.removeItem("otpEmail");
       setSuccess("OTP verified successfully! Redirecting...");
 
-      // Redirect to the home page immediately
       navigate("/");
     } catch (error) {
       setError("Error verifying OTP. Please try again.");
@@ -151,7 +147,7 @@ const Login = () => {
                 </label>
                 <input
                   className="text-gray-700 border border-gray-300 rounded py-2 px-4 block w-full focus:outline-2 focus:outline-blue-700"
-                  type={showPassword ? "text" : "password"} // Toggle password visibility
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -184,7 +180,7 @@ const Login = () => {
                   className={`bg-blue-700 text-white font-bold py-2 px-4 w-full rounded hover:bg-blue-600 ${
                     isButtonDisabled ? "opacity-50 cursor-not-allowed" : ""
                   }`}
-                  disabled={isButtonDisabled} // Disable the button based on the condition
+                  disabled={isButtonDisabled}
                 >
                   Send OTP
                 </button>
